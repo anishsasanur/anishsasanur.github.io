@@ -7,17 +7,127 @@
             font-family: Arial, sans-serif;
             margin: 20px;
         }
+        h3 {
+            max-width: 1000px;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
     <h1>proj 1</h1>
-    <h2>p1</h2>
-    <img src="./media/me_close.JPG" width="300" height="300">
-    <img src="./media/me_zoom.JPG" width="300" height="300">
-    <h2>p2</h2>
-    <img src="./media/amogus_close.JPG" width="300" height="300">
-    <img src="./media/amogus_zoom.JPG" width="300" height="300">
-    <h2>p3</h2>
-    <img src="./media/piplup.gif" width="300" height="300">
+    <h2>single-scale alignment</h2>
+
+    <h3>For Single Scale Alignment, I need to align the Green and Red frames with the Blue Frame such that all the pixels spatially matched. My approach was to try sliding each frame, Green and Red, until this match happened. I used a brute force algorithm that first sets a search radius (Defaulting to 10) and then iterate through that search radius, at each iteration I used np.roll() to shift the Green and Red frames, by the displacement vector, and then I caluclated a metric to see how well the frames matched. For the single scale alignment, Euclidean distance worked to see how close the frame vectors were. In my algorithm I made sure to crop margins before calculating the metric since np.roll would corrupt the margins with wrap around. After finding the displacement vector with the lowest euclidean distance, I then returned this for both Green and Red frames, applied it to them, and then stacked them with the Blue frame to get my final result!</h3>
+
+    <h3 style="color: blue;">cathedral</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (5, 2)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (12, 3)</h3>
+    <img src="./media/cathedral.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">monastery</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (-3, 2)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (3, 2)</h3>
+    <img src="./media/monastery.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">tobolsk</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (3, 2)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (6, 3)</h3>
+    <img src="./media/tobolsk.jpg" width="500" height="500">
+
+    <h2>multi-scale pyramid alignment</h2>
+
+    <h3>For larger images, I was not able to use single scale alignment since a search radius of only 10 would be to small to find the right displacement vector, and increasing the search radius would cause a quadratic increase in runtime since we now need to iterate over n^2 potential displacement vectors. To solve this, I looked into using an image pyramid. This would involve scaling down both the primary and target frame (B) and using traditional single scale alignment on the scaled frames. I could then use the displacement vector I found from the scaled down frame and use it as a starting point for the next scale I chose to use. And by iterativeley scaling up the frames, I could efficiently find the correct displacement vector for the original image. For my Algorithm, I used 5 levels, starting off at  2^(-5) scale, finding the displacement vector, and then unscaling that displacement vector to see what it would be for the original frame. These cumalitive displacements are stored in a dr, dc variable while current displacements are stored in cdr, cdc variables. After 5 levels of the image pyramid, we are able to get close alignment! This is much more computationally efficient since at scaled down versions, we are able to essentially roll the image by factors more than just pixel by pixel, and then refine our search the next time we scale up.</h3>
+
+    <h3>Additionally I also switched from using the Euclidean distance metric to using the NCC (Normalized Cross Correlation) metric, since the Euclidean distance metric was having difficulty aligning the images due to extraneous circumstances such as brightness, exposure, or contrast. This meant that even if the pixels were aligned, these other factors would overshadow the difference, and alignment would be inaccurate. NCC removes the mean and helps normalize in context of brightness, contrast, and exposure, which led to more accuracy.</h3>
+
+    <h3>The one photo I had difficulty aligning was emir.tif, despite much hyperparameter tuning, metric tuning and mroe, it seems like the red frame was still slightly off. When looking at the raw frames, the issue seems to be in how different the intensity of the dress seems to be in every frame. In the B frame, the dress is the lightest, and in the R frame, the dress is the darkest. The variance of the dress color is signifantly different from the variance of the rest of the picture which could lead to issues in calculating the metrics for both L2 and NCC.</h3>
+
+    <h3 style="color: blue;">cathedral</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (-336, -388)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (-329, -387)</h3>
+    <img src="./media/cathedral_pyramid.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">church</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (25, 3)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (58, -5)</h3>
+    <img src="./media/church.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">emir</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (49, 24)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (104, 55)</h3>
+    <img src="./media/emir.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">harvesters</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (60, 16)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (124, 14)</h3>
+    <img src="./media/harvesters.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">icon</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (40, 17)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (89, 23)</h3>
+    <img src="./media/icon.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">italil</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (38, 21)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (77, 35)</h3>
+    <img src="./media/italil.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">lastochikino</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (-3, -2)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (76, -9)</h3>
+    <img src="./media/lastochikino.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">lugano</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (41, -17)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (92, -29)</h3>
+    <img src="./media/lugano.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">melons</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (82, 9)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (177, 11)</h3>
+    <img src="./media/melons.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">monastery</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (-3, 2)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (3, 2)</h3>
+    <img src="./media/monastery_pyramid.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">self_portrait</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (79, 29)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (175, 34)</h3>
+    <img src="./media/self_portrait.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">siren</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (49, -7)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (96, -25)</h3>
+    <img src="./media/siren.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">three_generations</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (55, 13)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (112, 10)</h3>
+    <img src="./media/three_generations.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">tobolsk_pyramid</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (3, 2)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (6, 3)</h3>
+    <img src="./media/tobolsk_pyramid.jpg" width="500" height="500">
+
+    <h2>extra multi-scale pyramid alignment</h2>
+
+    <h3 style="color: blue;">water_supply</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (47, 14)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (108, 29)</h3>
+    <img src="./media/water_supply.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">milan</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (57, 12)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (125, 24)</h3>
+    <img src="./media/milan.jpg" width="500" height="500">
+
+    <h3 style="color: blue;">mozhaisk</h3>
+    <h3 style="color: blue;">G Channel Displacement:  (41, 15)<h3>
+    <h3 style="color: blue;">R Channel Displacement:  (91, 25)</h3>
+    <img src="./media/mozhaisk.jpg" width="500" height="500">
+    
 </body>
 </html>
