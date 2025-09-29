@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>proj 2</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>proj 2</h1>
+    <h2>Part 1: Filters & Edges</h2>
+    <h3>1.1: Here are my implementations of Convolution using both 4 for loops and 2, in both cases, the runtime is exceedingly long, taking 56.506 seconds and 74.169 seconds respectively to run the dx, dy. and box convolutions. Boundaries are handled by padding the original image with 0s so that the output is the same size.</h3>
+    <img src="media/convolution_code.png" width="600" height="600">
+    <h3>1.2: Derivatives</h3>
+    <h4>Cameraman with Finite Difference Filters</h4>
+    <table>
+    <tr>
+        <td><img src="media/cameraman_dx.png" width="200"></td>
+        <td><img src="media/cameraman_dy.png" width="200"></td>
+        <td><img src="media/cameraman_GM.png" width="200"></td>
+        <td><img src="media/cameraman_BE.png" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">dx filter</td>
+        <td style="text-align:center;">dy filter</td>
+        <td style="text-align:center;">gradient magnitude</td>
+        <td style="text-align:center;">cameraman binarized edge</td>
+    </tr>
+    </table>
+
+    <h3>1.3: I first used a finite difference operator, but then I made a DoG Kernel by simply convolving a gaussian with my original dx/dy kernels, as shown below. This has the same effect, and blurring the image actually makes binarized edges stronger!</h3>
+
+    <h4>New Gaussian Edge Kernels</h4>
+
+    <table>
+    <tr>
+        <td><img src="media/gauss_dx.png" width="200"></td>
+        <td><img src="media/gauss_dy.png" width="200"></td>
+
+    </tr>
+    <tr>
+        <td style="text-align:center;">gaussian dx filter</td>
+        <td style="text-align:center;">gaussian dy filter</td>
+    </tr>
+    </table>
+
+
+    <h4>Cameraman with new DoG Kernels Used</h4>
+    <table>
+    <tr>
+        <td><img src="media/cm_dog_gm.png" width="200"></td>
+        <td><img src="media/cm_dog_be.png" width="200"></td>
+
+    </tr>
+    <tr>
+        <td style="text-align:center;">Gradient Magnitude</td>
+        <td style="text-align:center;">Binarized Edge</td>
+    </tr>
+    </table>
+
+    <h2>Part 2: Applications</h2>
+
+    <h3>2.1: The unsharp mask filter is essentially subtracting a lower frequency or blurrier layer of the image from the original, and this isolates the high frequency features from the image. Then this high frequency layer is added back onto the original image making it appear sharper. After tweaking around with the scale value for sharpening, I noticed that using too high of a value, overides the original image with too many high frequencies, leading the image to consist mostly of just edges.</h3>
+    <table>
+    <tr>
+        <td><img src="media/taj_normal.png" width="200"></td>
+        <td><img src="media/taj_blur.png" width="200"></td>
+        <td><img src="media/taj_high_freq.png" width="200"></td>
+        <td><img src="media/taj_sharpened.png" width="200"></td>
+        <td><img src="media/taj_sharpen_x5.png" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">Taj Normal</td>
+        <td style="text-align:center;">Taj Blur</td>
+        <td style="text-align:center;">Taj High Frequency</td>
+        <td style="text-align:center;">Taj Sharpened x2</td>
+        <td style="text-align:center;">Taj Sharpened x5</td>
+    </tr>
+    </table>
+
+    <table>
+    <tr>
+        <td><img src="media/cat_norm.png" width="200"></td>
+        <td><img src="media/cat_sharpened.png" width="200"></td>
+        <td><img src="media/cat_sharpen_x3.png" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">Cat Normal</td>
+        <td style="text-align:center;">Cat Sharpened x1</td>
+        <td style="text-align:center;">Cat Sharpened x3</td>
+
+    </tr>
+    </table>
+
+    <h3>2.2</h3>
+
+    <table>
+    <tr>
+        <td><img src="media/DerekPicture.jpg" width="200"></td>
+        <td><img src="media/nutmeg.jpg" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">Derek OG</td>
+        <td style="text-align:center;">Nutmeg OG</td>
+
+    </tr>
+    </table>
+
+    <table>
+    <tr>
+        <td><img src="media/derek_aligned.png" width="200"></td>
+        <td><img src="media/nutmeg_aligned.png" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">Derek Aligned</td>
+        <td style="text-align:center;">Nutmeg Aligned</td>
+
+    </tr>
+    </table>
+
+    <table>
+    <tr>
+        <td><img src="media/derek_hf.png" width="200"></td>
+        <td><img src="media/nutmeg_lf.png" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">Derek Filtered (High Freq)</td>
+        <td style="text-align:center;">Nutmeg Filtered (Low Freq)</td>
+
+    </tr>
+    </table>
+
+    <table>
+    <tr>
+        <td><img src="media/derek_fourier.png" width="200"></td>
+        <td><img src="media/nutmeg_fourier.png" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">Derek Fourier (High Freq)</td>
+        <td style="text-align:center;">Nutmeg Fourier (Low Freq)</td>
+
+    </tr>
+    </table>
+
+    <table>
+    <tr>
+        <td><img src="media/derek_nutmet_hybrid.png" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">Final Hybrid</td>
+
+    </tr>
+    </table>
+
+
+    <table>
+    <tr>
+        <td><img src="media/anish.jpg" width="200"></td>
+        <td><img src="media/pikachu.jpg" width="200"></td>
+        <td><img src="media/anish_pikachu.png" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">Anish</td>
+        <td style="text-align:center;">Pikachu</td>
+        <td style="text-align:center;">Hybrid</td>
+
+    </tr>
+    </table>
+
+    <table>
+    <tr>
+        <td><img src="media/beluga.jpg" width="200"></td>
+        <td><img src="media/doge.jpg" width="200"></td>
+        <td><img src="media/beluga_doge_hybrid.png" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">Cat</td>
+        <td style="text-align:center;">Dog</td>
+        <td style="text-align:center;">Hybrid</td>
+
+    </tr>
+    </table>
+
+    <h3>2.3</h3>
+
+    <img src="media/apple_orange_graph.png" width="800">
+
+    <table>
+    <tr>
+        <td><img src="media/.jpg" width="200"></td>
+        <td><img src="media/doge.jpg" width="200"></td>
+        <td><img src="media/beluga_doge_hybrid.png" width="200"></td>
+    </tr>
+    <tr>
+        <td style="text-align:center;">Cat</td>
+        <td style="text-align:center;">Dog</td>
+        <td style="text-align:center;">Hybrid</td>
+
+    </tr>
+    </table>
+
+    
+</body>
+</html>
