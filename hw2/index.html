@@ -1,0 +1,116 @@
+<html>
+	<head>
+		<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=default'></script>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+		<style>
+			h1 {
+				text-align: center;
+			}
+
+			.container {
+				margin: 0 auto;
+				padding: 60px 20%;
+			}
+
+			body {
+				font-family: 'Inter', sans-serif;
+				line-height: 1.5;
+			}
+
+			h2, h3 {
+				margin-top: 32px;
+			}
+
+			.placeholder {
+				min-height: 1.5em;
+				border-bottom: 1px dashed #ccc;
+				margin-top: 8px;
+				margin-bottom: 8px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h1>CS184/284A Spring 2025 Homework 2 Write-Up</h1>
+			<div style="text-align: center;">Anish Sasanur</div>
+
+			<br>
+
+			<p><strong>Link to webpage:</strong> <span class="placeholder">https://anishsasanur.github.io/hw2/index.html</span></p>
+
+			<p><strong>Link to GitHub repository:</strong> <span class="placeholder">https://github.com/cal-cs184-student/hw2-meshedit-shina18 </span></p>
+
+			<h2>Overview (3 pts)</h2>
+
+			<p class="placeholder">I implemented de Casteljau evaluation for Bezier curves and extended the same idea to Bezier surfaces by doing separable 1D evaluations in the u and v directions. On the mesh side, I worked directly with the half-edge structure to compute area-weighted vertex normals for smooth shading, and then implemented local remeshing operations (edge flip and edge split) by carefully rewiring pointers. Finally, I put those pieces together to do Loop subdivision: computing new vertex/edge positions, splitting original edges, flipping the right new edges, and updating positions to generate a smoother, higher-res mesh (including boundary handling).</p>
+
+			<h2>Part 1 (13 pts)</h2>
+
+			<p class="placeholder">De Casteljau’s algorithm evaluates a Bezier curve at a parameter t by repeatedly linearly interpolating between neighboring control points. Starting from the original control points, you create a new set, then repeat this process on the new set until only one point remains. That final point is the position of the curve at t. In my implementation, BezierCurve::evaluateStep performs exactly one of these interpolation steps: it loops over the input points, computes the interpolated points using the class member t, and returns the next-level set of points.</p>
+
+			<img src="images/bezier_curve_1.png" width="500" height="500" />
+			<img src="images/bc_curve_2.png" width="500" height="500" />
+			<img src="images/bc_curve_3.png" width="500" height="500" />
+			<img src="images/bc_curve_4.png" width="500" height="500" />
+			<img src="images/bc_curve_5.png" width="500" height="500" />
+			<img src="images/bc_curve_6_end.png" width="500" height="500" />
+			<img src="images/final_bc.png" width="500" height="500" />
+
+			<img src="images/modified_bc.png" width="500" height="500" />
+
+			<h2>Part 2 (15 pts)</h2>
+
+			<p class="placeholder">De Casteljau extends to Bezier surfaces by treating the surface as two 1D curves: you first treat each row of the control grid as a Bezier curve and evaluate it at parameter u to get one point per row, then treat those points as a single Bezier curve and evaluate it at v to get the final point on the surface. I implemented evaluateStep to do one level of linear interpolation between consecutive 3D points (same idea as Part 1), and evaluate1D to keep calling it until only one point is left. For evaluate(u, v), I run evaluate1D on each row of controlPoints with u, collect those results into a vector, and then run evaluate1D on that vector with v to get the surface point.</p>
+
+			<img src="images/teapot.png" width="500" height="500" />
+
+			<h2>Part 3 (12 pts)</h2>
+
+			<p class="placeholder">I iterate over every incident face of the vertex by starting at its halfedge and using h->twin()->next() to move to the next face. For each interior face (skipping boundary faces), I get its three vertices via the halfedge loop and compute the unnormalized face normal as half the cross product of two edges. I add that to a running sum so each face contributes proportionally to its area, then return the normalized sum. I also return the zero vector when the sum has negligible length to avoid dividing by zero.</p>
+
+			<img src="images/p3_teapot_untoggle.png" width="500" height="500" />
+			<img src="images/p3_teapot_toggle.png" width="500" height="500" />
+
+
+			<h2>Part 4 (12 pts)</h2>
+
+			<p class="placeholder">I implemented edge flip by first grabbing the six halfedges around the two incident triangles and labeling the four vertices in the usual a–b–c–d configuration. Then I rewired the central edge so its two halfedges now point between the opposite vertices, and updated all the next, face, vertex, and halfedge pointers in that local 2-triangle patch to match the flipped connectivity. I also early-return for boundary edges so I never try to flip something on the mesh boundary. For debugging, I drew the local half-edge diagram with all labels, flipped edges back and forth on simple meshes, and used repeated flips on the same edge in the viewer to catch any missed pointers (crashes or holes usually meant a next or face was wrong).</p>
+
+			<img src="images/teapot_pre_flip.png" width="500" height="500" />
+			<img src="images/teapot_post_flip.png" width="500" height="500" />
+
+			<h2>Part 5 (20 pts)</h2>
+
+			<p class="placeholder">I implemented edge split by taking the two triangles around the selected interior edge, creating a new midpoint vertex, and then rewiring the local half-edge connectivity so the original two faces become four smaller triangles. Concretely, I reused the original edge as one half of the split, added three new edges from the midpoint to the two opposite vertices and to the other endpoint, and created two new faces plus the needed new halfedges/twins. The main point was making sure every affected halfedge had the correct next, face, edge, and vertex pointers, and that each vertex/face still points to a valid incident halfedge afterward. For debugging, I kept a labeled drawing of the 2-triangle neighborhood and repeatedly alternated split/flip operations in the viewer, any missed pointer usually showed up quickly as a hole or a crash.</p>
+
+			<img src="images/cow_og.png" width="500" height="500" />
+			
+			<h3>Edge split screenshots</h3>
+			<img src="images/cow_edge_split.png" width="500" height="500" />
+
+			<h3>Combined edge flips and splits</h3>
+			<img src="images/cow_split_flip.png" width="500" height="500" />
+
+			<h2>Part 6 (25 pts)</h2>
+
+			<h3>Loop subdivision implementation</h3>
+			<p class="placeholder">I followed the standard three-phase Loop workflow: first compute and store newPosition for all original vertices and newPosition for all original edges (without moving anything yet), then split only the original edges, flip the “wrong” new edges (the ones connecting one old and one new vertex), and finally copy newPosition into position. The key implementation detail was tracking Vertex::isNew and Edge::isNew correctly so I only flip the edges that Loop subdivision intends (not the two halves of an original edge). For debugging, I tested on small meshes and repeatedly applied split/flip/upsample in different regions, if any pointer was wrong you’d usually see holes, non-manifold shading, or a crash quickly. I also sanity-checked by doing multiple iterations and making sure the surface gets progressively smoother instead of exploding or tearing.</p>
+
+			<img src="images/bean_og.png" width="500" height="500" />
+			<img src="images/bean_upsample.png" width="500" height="500" />
+			<h3>Behavior of meshes after subdivision</h3>
+			<p class="placeholder">After a few iterations, Loop subdivision tends to smooth and round off sharp features—corners become more ball-like and sharp creases soften because the scheme is averaging positions based on connectivity. I also noticed the surface can shrink slightly and silhouettes become less boxy, especially on models with hard edges. You can reduce how much a corner/edge rounds by pre-splitting edges near the feature (basically adding supporting edges/extra triangles near the crease), which keeps more control points near that region so the averaging doesn’t wash it out as much.</p>
+
+			<img src="images/cube_og.png" width="500" height="500" />
+			<img src="images/cube_upsampled.png" width="500" height="500" />
+			<h3>Cube subdivision symmetry experiment</h3>
+			<p class="placeholder">On dae/cube.dae, the cube becoming slightly asymmetric is usually because the cube faces are triangulated with a particular diagonal pattern, and that connectivity isn’t perfectly symmetric across the whole shape. Loop subdivision depends on mesh connectivity/valence, not just geometry, so even if the cube is geometrically symmetric, an asymmetric triangulation leads to slightly different neighbor averaging on different corners/edges. A practical fix is to pre-process the cube so the triangulation is symmetric, use edge flips to make face diagonals follow a consistent, symmetric pattern across opposite faces, and/or split faces/edges so each face subdivides in a more uniform way. This helps because the local neighborhoods around corresponding vertices become identical (same connectivity), so the same weights produce symmetric updates each iteration.</p>
+
+			<h3>Extra credit extensions</h3>
+			<p class="placeholder">I added boundary support so boundary edges can be split and boundary vertices update with the special boundary rule. In Loop subdivision, boundary edges insert the midpoint which keeps the boundary curve smoother and prevents weird boundary drift compared to using the interior rule everywhere.</p>
+			<img src="images/weird_og.png" width="500" height="500" />
+			<img src="images/weird_upsample.png" width="500" height="500" />
+
+		</div>
+	</body>
+</html>
