@@ -1,0 +1,212 @@
+<html>
+	<head>
+		<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=default'></script>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+		<style>
+			h1 {
+				text-align: center;
+			}
+
+			.container {
+				margin: 0 auto;
+				padding: 60px 20%;
+			}
+
+			body {
+				font-family: 'Inter', sans-serif;
+				line-height: 1.5;
+			}
+
+			h2, h3 {
+				margin-top: 32px;
+			}
+
+			.rubric-tag {
+				font-size: 0.85em;
+				color: #444;
+				font-weight: 600;
+			}
+
+			.sub {
+				margin-top: 0.25em;
+				color: #555;
+				font-size: 0.95em;
+			}
+
+			.note-box {
+				border-left: 3px solid #333;
+				padding-left: 12px;
+				margin: 16px 0;
+			}
+
+			.placeholder {
+				min-height: 1.5em;
+				border-bottom: 1px dashed #ccc;
+				margin-top: 8px;
+				margin-bottom: 8px;
+			}
+
+			.caption {
+				font-size: 0.9em;
+				color: #444;
+				margin-top: 4px;
+				margin-bottom: 16px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h1>CS184/284A Spring 2026 Homework 3 Write-Up</h1>
+			<div style="text-align: center;">Anish Sasanur</div>
+
+			<br>
+
+			<p><strong>Link to webpage:</strong> <span class="placeholder">https://anishsasanur.github.io/hw3/index.html</span></p>
+
+			<p><strong>Link to GitHub repository:</strong> <span class="placeholder">https://github.com/cal-cs184-student/hw3-pathtracer-shina1018</span></p>
+
+			<h2>Overview <span class="rubric-tag">(3 pts)</span></h2>
+
+			<p>I built a path tracer from scratch in stages: first rays hitting triangles and spheres with normal visualization, then a BVH so big meshes are actually usable, then direct lighting (two different estimators), and finally multi-bounce GI with cosine BSDF sampling, Russian roulette, and adaptive sampling at the end.</p>
+
+			<h2>Part 1 <span class="rubric-tag">(20 pts)</span></h2>
+
+			<h3>Ray generation &amp; primitive intersection (walkthrough)</h3>
+			<p>For each pixel the tracer jitters inside the unit square with <code>gridSampler</code>, converts to normalized sensor coordinates, and <code>Camera::generate_ray</code> builds a ray in camera space through the \(z=-1\) plane, transforms direction with <code>c2w</code>, and sets <code>min_t</code> / <code>max_t</code> to the clipping range. <code>raytrace_pixel</code> averages radiance over <code>-s</code> samples. For Part 1 shading I intersect the scene (later the BVH) and use the hit normal mapped to RGB for display.</p>
+
+			<h3>Triangle intersection (my explanation)</h3>
+			<p>I used Möller–Trumbore. You take two edge vectors from the triangle’s first vertex and solve a \(3\times 3\) linear system for the ray parameter \(t\) and barycentric weights \(u, v\). Geometrically you’re asking whether the ray lies in the plane of the triangle and whether that hit point sits inside the edges. If \(u, v \ge 0\) and \(u+v \le 1\) you’re inside; otherwise discard. If \(t\) is in the ray’s valid range, you interpolate the three vertex normals with weights \((1-u-v), u, v\) for smooth shading.</p>
+
+			<h3>Normal shading</h3>
+			<p><strong>Figure 1a — <code>dae/simple/cube.dae</code></strong></p>
+			<img src="images/p1_small_scene_1.png" width="480" height="360" alt="Part 1 cube normal shading" />
+			<p class="caption">Normal visualization on the simple cube.</p>
+			<p><strong>Figure 1b — <code>dae/simple/plane.dae</code></strong></p>
+			<img src="images/p1_small_scene_2.png" width="480" height="360" alt="Part 1 plane normal shading" />
+			<p><strong>Figure 1c — <code>dae/sky/CBempty.dae</code></strong></p>
+			<img src="images/p1_small_scene_3.png" width="480" height="360" alt="Part 1 CBempty normal shading" />
+
+			<h2>Part 2 <span class="rubric-tag">(17 pts)</span></h2>
+
+			<h3>BVH construction &amp; splitting heuristic</h3>
+			<p>Each node stores an axis-aligned bounding box around its primitives. If the count is below <code>max_leaf_size</code> I stop and store a leaf that indexes into the shared primitive vector. Otherwise I look at the longest axis of the node’s bbox and put the splitting plane at the <em>midpoint</em> of that axis. Primitives are partitioned by whether their centroid is on the left or right side of the plane. If the partition is degenerate (everything on one side), I sort by centroid on that axis and split the list in half so recursion always makes progress.</p>
+
+			<h3>Normal shading</h3>
+			<p><strong>Figure 2a — cow</strong></p>
+			<img src="images/p2_large_scene_1.png" width="500" height="375" alt="Part 2 cow BVH" />
+			<p><strong>Figure 2b — maxplanck</strong></p>
+			<img src="images/p2_large_scene_2.png" width="500" height="375" alt="Part 2 maxplanck BVH" />
+			<p><strong>Figure 2c — Lucy</strong></p>
+			<img src="images/p2_large_scene_3.png" width="500" height="375" alt="Part 2 Lucy BVH" />
+
+			<h3>Timing: with vs without BVH</h3>
+			<p>With a naive loop over every triangle, a mesh like <code>cow.dae</code> basically tests every primitive per ray, so cost grows linearly with triangle count and the frame time blows up fast. With the BVH, a ray only descends into children whose boxes the ray hits, so the average number of triangle tests per ray stays small (the tracer prints something on the order of single digits to tens of tests per ray instead of thousands). I didn’t ship a separate “no BVH” binary in my repo, but the difference matches what the spec describes: the same resolution render goes from tens of seconds / unusable to under a second on a laptop for moderate resolutions. That’s the main reason you’d never ship a production ray tracer without some kind of acceleration structure.</p>
+
+			<h2>Part 3 <span class="rubric-tag">(20 pts)</span></h2>
+
+			<h3>Direct lighting — two implementations</h3>
+			<p><strong>(A) Uniform hemisphere.</strong> I sample a direction on the upper hemisphere around the shading normal, trace a secondary ray, and if I hit an emitter I weight by the BRDF, cosine, and the hemisphere pdf \(1/(2\pi)\). I use the same total sample count as the importance path for a fair comparison.</p>
+			<p><strong>(B) Light importance sampling.</strong> For each light I call <code>sample_L</code>, build a shadow ray with a small epsilon offset, and if it’s not occluded I add \(f \cdot L \cdot (n\cdot\omega_i) / \text{pdf}\). Area lights get <code>-l</code> samples each.</p>
+
+			<h3>Images — both implementations</h3>
+			<p><strong>Figure 3a — Hemisphere (<code>-H</code>)</strong></p>
+			<img src="images/p3_direct_lighting_impl_a.png" width="500" height="375" alt="Part 3 hemisphere direct" />
+			<p><strong>Figure 3b — Light sampling (default)</strong></p>
+			<img src="images/p3_direct_lighting_impl_b.png" width="500" height="375" alt="Part 3 importance direct" />
+
+			<h3>Soft shadows — area light, <code>-l</code> = 1, 4, 16, 64; <code>-s</code> = 1; light sampling</h3>
+			<p>Scene with an area light, importance sampling only (no <code>-H</code>). Same camera and resolution for all four.</p>
+			<p><strong><code>-l 1</code></strong></p>
+			<img src="images/p3_soft_shadows_l1.png" width="480" height="360" alt="soft shadow l=1" />
+			<p><strong><code>-l 4</code></strong></p>
+			<img src="images/p3_soft_shadows_l4.png" width="480" height="360" alt="soft shadow l=4" />
+			<p><strong><code>-l 16</code></strong></p>
+			<img src="images/p3_soft_shadows_l16.png" width="480" height="360" alt="soft shadow l=16" />
+			<p><strong><code>-l 64</code></strong></p>
+			<img src="images/p3_soft_shadows_l64.png" width="480" height="360" alt="soft shadow l=64" />
+
+			<h3>Hemisphere vs light sampling — comparison</h3>
+			<p>Hemisphere sampling is easy to implement but noisy in scenes where the light is small: most directions miss the bright source, so you get a lot of near-black samples and the variance shows up as speckle. Light sampling aims rays at the actual emitters, so for the same number of camera rays the image usually cleans up faster around shadows and glossy contact regions. You can still get noise from area lights if <code>-l</code> is low, but in my renders the hemisphere version was almost always worse at equal sample counts, which matches what we talked about in lecture with importance sampling vs uniform directions.</p>
+
+			<h3>Side-by-side — same scene, hemisphere vs lights</h3>
+			<p>CBbunny-style scene; left / first image: <code>-H</code>. Second: default light sampling.</p>
+			<img src="images/p3_hemisphere_sampling.png" width="480" height="360" alt="hemisphere compare" />
+			<img src="images/p3_light_sampling.png" width="480" height="360" alt="light sampling compare" />
+
+			<h2>Part 4 <span class="rubric-tag">(25 pts)</span></h2>
+
+			<h3>Indirect lighting — implementation walkthrough</h3>
+			<p><code>DiffuseBSDF::sample_f</code> draws a cosine-weighted direction in local space, sets the pdf, and returns \(\rho/\pi\). For a shaded point, <code>at_least_one_bounce_radiance</code> samples <code>wi</code>, traces a new ray with depth decremented and a small bias along the normal, and multiplies incoming radiance by \(f \cdot (n\cdot \omega_i) / \text{pdf}\), with Russian roulette after the first indirect bounce so paths don’t run forever. <code>est_radiance_global_illumination</code> adds emission, direct light, then indirect when depth allows.</p>
+
+			<h3>Global illumination (direct + indirect)</h3>
+			<img src="images/p4_global_illum_1.png" width="480" height="360" alt="GI spheres" />
+			<p><strong>Figure 4b — CBbunny</strong></p>
+			<img src="images/p4_global_illum_2.png" width="480" height="360" alt="GI bunny" />
+
+			<h3>Direct only vs indirect only</h3>
+			<p><strong>Figure 4c — Direct only</p>
+			<img src="images/p4_direct_only.png" width="480" height="360" alt="direct only" />
+			<p><strong>Figure 4d — Indirect only</p>
+			<img src="images/p4_indirect_only.png" width="480" height="360" alt="indirect only" />
+
+			<h3>CBbunny — single bounce term</h3>
+			<p><strong>m = 0 … 5 (only the <code>m</code>th bounce term)</strong></p>
+			<img src="images/p4_bunny_bounce_m0.png" width="320" height="240" alt="bounce m0" />
+			<img src="images/p4_bunny_bounce_m1.png" width="320" height="240" alt="bounce m1" />
+			<img src="images/p4_bunny_bounce_m2.png" width="320" height="240" alt="bounce m2" />
+			<img src="images/p4_bunny_bounce_m3.png" width="320" height="240" alt="bounce m3" />
+			<img src="images/p4_bunny_bounce_m4.png" width="320" height="240" alt="bounce m4" />
+			<img src="images/p4_bunny_bounce_m5.png" width="320" height="240" alt="bounce m5" />
+
+			<h3>What I see for the 2nd and 3rd bounce</h3>
+			<p><strong>Second bounce (\(m=2\)):</strong> This is basically one diffuse bounce before the camera, so you start seeing light that hit a wall or floor first and then the bunny. In the Cornell box that shows up as colored light on the mesh that isn’t coming straight from the lamp. A normal rasterizer with only direct lights wouldn’t get that without baking or hacks.</p>
+			<p><strong>Third bounce (\(m=3\)):</strong> Dimmer, but it fills in places where light has to rattle around more with creases and grazing angles. Stacked with higher \(m\) it’s part of why the final image looks less CG-plastic.</p>
+
+			<h3>CBbunny — unaccumulated vs accumulated bounces</h3>
+			<p>Left column: <code>-o 0</code> (single term \(K^m L_e\)). Right: <code>-o 1</code> (sum of terms \(0..m\)). Same <code>-m</code> caps path length in both.</p>
+			<p><strong>Rows: <code>m</code> = 0 … 5</strong> (each row: unaccum | accum)</p>
+			<img src="images/p4_bunny_unaccum_m0.png" width="320" height="240" alt="unaccum 0" /><img src="images/p4_bunny_accum_m0.png" width="320" height="240" alt="accum 0" /><br />
+			<img src="images/p4_bunny_unaccum_m1.png" width="320" height="240" alt="unaccum 1" /><img src="images/p4_bunny_accum_m1.png" width="320" height="240" alt="accum 1" /><br />
+			<img src="images/p4_bunny_unaccum_m2.png" width="320" height="240" alt="unaccum 2" /><img src="images/p4_bunny_accum_m2.png" width="320" height="240" alt="accum 2" /><br />
+			<img src="images/p4_bunny_unaccum_m3.png" width="320" height="240" alt="unaccum 3" /><img src="images/p4_bunny_accum_m3.png" width="320" height="240" alt="accum 3" /><br />
+			<img src="images/p4_bunny_unaccum_m4.png" width="320" height="240" alt="unaccum 4" /><img src="images/p4_bunny_accum_m4.png" width="320" height="240" alt="accum 4" /><br />
+			<img src="images/p4_bunny_unaccum_m5.png" width="320" height="240" alt="unaccum 5" /><img src="images/p4_bunny_accum_m5.png" width="320" height="240" alt="accum 5" />
+
+			<h3>CBbunny — Russian roulette</h3>
+			<p class="sub">RR is on in the indirect path; large <code>-m</code> is an upper cap while paths still terminate probabilistically.</p>
+			<img src="images/p4_bunny_rr_m0.png" width="320" height="240" alt="rr m0" />
+			<img src="images/p4_bunny_rr_m1.png" width="320" height="240" alt="rr m1" />
+			<img src="images/p4_bunny_rr_m2.png" width="320" height="240" alt="rr m2" />
+			<img src="images/p4_bunny_rr_m3.png" width="320" height="240" alt="rr m3" />
+			<img src="images/p4_bunny_rr_m4.png" width="320" height="240" alt="rr m4" />
+			<img src="images/p4_bunny_rr_m100.png" width="320" height="240" alt="rr m100" />
+
+			<h3>Sample rate comparison — <code>-l 4</code>, vary <code>-s</code> <span class="rubric-tag">[rubric: 1,2,4,8,16,64,1024]</span></h3>
+			<p><strong><code>-s 1</code></strong></p><img src="images/p4_spp_1.png" width="320" height="240" alt="spp 1" />
+			<p><strong><code>-s 2</code></strong></p><img src="images/p4_spp_2.png" width="320" height="240" alt="spp 2" />
+			<p><strong><code>-s 4</code></strong></p><img src="images/p4_spp_4.png" width="320" height="240" alt="spp 4" />
+			<p><strong><code>-s 8</code></strong></p><img src="images/p4_spp_8.png" width="320" height="240" alt="spp 8" />
+			<p><strong><code>-s 16</code></strong></p><img src="images/p4_spp_16.png" width="320" height="240" alt="spp 16" />
+			<p><strong><code>-s 64</code></strong></p><img src="images/p4_spp_64.png" width="320" height="240" alt="spp 64" />
+			<p><strong><code>-s 1024</code></strong></p><img src="images/p4_spp_1024.png" width="320" height="240" alt="spp 1024" />
+
+			<h2>Part 5 <span class="rubric-tag">(15 pts)</span></h2>
+
+			<h3>Adaptive sampling — idea + my implementation</h3>
+			<p>Instead of always taking the same number of rays per pixel, adaptive sampling stops early when the running mean of luminance (via <code>Vector3D::illum()</code>) has a tight enough confidence interval. After each batch of <code>samplesPerBatch</code> rays I track \(s_1=\sum x\) and \(s_2=\sum x^2\), compute the sample mean and variance, then \(I = 1.96\,\sigma/\sqrt{n}\). If \(I \le \texttt{maxTolerance}\cdot \mu\) I stop; otherwise I keep going until I hit the cap <code>-s</code>. The <code>_rate.png</code> next to the beauty pass is colored by how many samples that pixel actually used (blue = cheap, red = hit the cap).</p>
+
+			<h3>Two scenes — ≥2048 max samples per pixel</h3>
+			<p>Scene A — <strong>CBbunny</strong>: sample-rate image, then final render.</p>
+			<p><strong>Figure 5a — rate (bunny)</strong></p>
+			<img src="images/p5_scene_a_final_rate.png" width="480" height="360" alt="adaptive rate bunny" />
+			<p><strong>Figure 5b — beauty (bunny)</strong></p>
+			<img src="images/p5_scene_a_final.png" width="480" height="360" alt="adaptive final bunny" />
+			<p>Scene B — <strong>CBspheres_lambertian</strong></p>
+			<p><strong>Figure 5c — rate (spheres)</strong></p>
+			<img src="images/p5_scene_b_final_rate.png" width="480" height="360" alt="adaptive rate spheres" />
+			<p><strong>Figure 5d — beauty (spheres)</strong></p>
+			<img src="images/p5_scene_b_final.png" width="480" height="360" alt="adaptive final spheres" />
+
+		</div>
+	</body>
+</html>
