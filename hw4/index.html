@@ -1,0 +1,335 @@
+<html>
+	<head>
+		<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=default'></script>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+		<style>
+			h1 {
+				text-align: center;
+			}
+
+			.container {
+				margin: 0 auto;
+				padding: 60px 20%;
+			}
+
+			body {
+				font-family: 'Inter', sans-serif;
+				line-height: 1.5;
+			}
+
+			h2, h3 {
+				margin-top: 32px;
+			}
+
+			.rubric-tag {
+				font-size: 0.85em;
+				color: #444;
+				font-weight: 600;
+			}
+
+			.sub {
+				margin-top: 0.25em;
+				color: #555;
+				font-size: 0.95em;
+			}
+
+			.note-box {
+				border-left: 3px solid #333;
+				padding-left: 12px;
+				margin: 16px 0;
+			}
+
+			.placeholder {
+				min-height: 1.5em;
+				border-bottom: 1px dashed #ccc;
+				margin-top: 8px;
+				margin-bottom: 8px;
+			}
+
+			.caption {
+				font-size: 0.9em;
+				color: #444;
+				margin-top: 4px;
+				margin-bottom: 16px;
+			}
+
+			/* Image placeholder style:
+			   - Replace the src with your screenshot path when ready.
+			   - Keep alt text descriptive (helps rubric + accessibility). */
+			img {
+				max-width: 100%;
+				height: auto;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h1>CS184/284A Spring 2026 Homework 4 Write-Up</h1>
+			<div style="text-align: center;">Anish Sasanur</div>
+
+			<br>
+
+			<p><strong>Link to webpage:</strong> <span class="placeholder">https://anishsasanur.github.io/hw1/index.html</span></p>
+
+			<p><strong>Link to GitHub repository:</strong> <span class="placeholder">N/A: Unable to Clone submitted as zip</span></p>
+
+
+			<h2>Overview <span class="rubric-tag">(3 pts)</span></h2>
+			<p>
+				In this assignment I built a real-time cloth sim using a mass-spring model. I started by generating the grid of point masses and springs, then added
+				forces + Verlet integration with damping and a Provot-style stretch limit for stability. After that I implemented collisions with spheres/planes and
+				self-collisions using spatial hashing so the cloth doesn’t clip through itself. Finally, I wrote a set of GLSL shaders (diffuse, Blinn-Phong, texture
+				mapping, bump/displacement, and environment-mapped mirror) to render the cloth with more realistic lighting and materials. The coolest part for me was
+				seeing how small parameter changes (like \(k_s\), density, damping) and mesh resolution can totally change the look and behavior.
+			</p>
+
+			<h2>Part 1: Masses and springs <span class="rubric-tag">(17 pts)</span></h2>
+
+			<h3>Wireframe structure screenshots (pinned2.json)</h3>
+
+			<p><strong>Figure 1a — Wireframe WITHOUT any shearing constraints</strong></p>
+
+			<img src="images/img1a_no_shearing_constraints.png" width="800" alt="TODO: pinned2.json wireframe without shearing constraints" />
+			<p class="caption">Pinned2 wireframe with <strong>shearing disabled</strong> (no diagonal spring pattern).</p>
+
+			<p><strong>Figure 1b — Wireframe WITH ONLY shearing constraints</strong></p>
+
+			<img src="images/img1b_only_shearing.png" width="800" alt="TODO: pinned2.json wireframe with only shearing constraints" />
+			<p class="caption">Pinned2 wireframe with <strong>only shearing enabled</strong> (diagonal springs visible).</p>
+
+			<p><strong>Figure 1c — Wireframe WITH ALL constraints</strong></p>
+			<img src="images/img1c_all_constraints.png" width="800" alt="TODO: pinned2.json wireframe with all constraints enabled" />
+			<p class="caption">Pinned2 wireframe with <strong>all constraints enabled</strong> (structural + shearing + bending).</p>
+
+			<h2>Part 2: Simulation via numerical integration <span class="rubric-tag">(20 pts)</span></h2>
+
+			<h3>Effects of spring constant \(k_s\)</h3>
+			<p>
+				When I lowered \(k_s\) a lot, the cloth basically acted like a loose, stretchy fabric: it deformed a ton under gravity and the
+				pinned corners could “pull” a long way before the springs noticeably fought back. It also tended to look kind of drapey and
+				you could see bigger, smoother sagging shapes.
+			</p>
+			<p>
+				When I cranked \(k_s\) up really high, the cloth felt much stiffer. It didn’t stretch much, and instead of sagging deeply it kept a
+				tighter shape and made sharper folds / wrinkles. Compared to the default, high \(k_s\) looked more “rigid sheet”, while low \(k_s\)
+				looked more “rubber cloth.”
+			</p>
+			<p><strong>Figure 2a — Low \(k_s\) example (interesting moment)</strong></p>
+			<img src="images/img2b_low_ks.png" width="800" alt="TODO: low ks screenshot demonstrating behavior" />
+			<p class="caption">Screenshot taken at beginning of fall</p>
+			<p><strong>Figure 2b — High \(k_s\) example (interesting moment)</strong></p>
+			<img src="images/img2a_high_ks.png" width="800" alt="TODO: high ks screenshot demonstrating behavior" />
+			<p class="caption">Screenshot taken at beginning of fall</p>
+
+			<h3>Effects of density</h3>
+			<p>
+				Changing density mostly changed how “heavy” the cloth felt. With higher density, gravity had more effect, so the cloth would sag
+				more aggressively and it tended to hit a deeper resting shape. With lower density, it felt lighter and didn’t droop as much, and the
+				motion looked a bit more floaty.
+			</p>
+			<p>
+				Compared to the default parameters, the most obvious difference for me was how deep the cloth sagged and how strong the folds got
+				when it was heavier versus lighter.
+			</p>
+			<p><strong>Figure 2c — Density variation (interesting moment)</strong></p>
+			<img src="images/img2c_high_density.png" width="800" alt="TODO: density screenshot demonstrating behavior" />
+			<p class="caption">Cloth is folded inwards significantly</p>
+
+			<h3>Effects of damping</h3>
+			<p>
+				Damping mainly controlled how quickly the cloth stopped wobbling. With low damping, it kept oscillating for a while and you could see
+				it “ring” after the initial drop. With higher damping, the motion died out much faster and the cloth reached a stable resting state
+				without as much bouncing.
+			</p>
+			<p>
+				If damping is set really high, the motion starts to look kind of dead/overdamped (like it’s moving through thick syrup), which makes it
+				settle quickly but also looks less realistic.
+			</p>
+			<p><strong>Figure 2d — Damping variation (interesting moment)</strong></p>
+			<img src="images/img2d_high dampening.png" width="800" alt="TODO: damping screenshot demonstrating behavior" />
+			<p class="caption">Slow descent due to high dampening</p>
+
+			<h3>Shaded cloth at rest (pinned4.json)</h3>
+			<p><strong>Figure 2e — <code>scene/pinned4.json</code> shaded cloth in final resting state</strong></p>
+			<img src="images/img2e_pinned4.png" width="800" alt="TODO: pinned4.json shaded cloth final resting state" />
+
+			<h2>Part 3: Handling collisions with other objects <span class="rubric-tag">(20 pts)</span></h2>
+			<h3>Collision handling implementation (spheres and planes)</h3>
+			<p>
+				For collisions, I treated each point mass like a particle that can’t end up “inside” the collision primitive after a timestep.
+				Each frame, after I do Verlet integration, I loop over all point masses and call <code>collide()</code> on every collision object
+				in the scene.
+			</p>
+			<p>
+				<strong>Sphere:</strong> I check if the point mass ended up inside the sphere by comparing the distance to the sphere’s center
+				against the radius. If it’s inside, I compute the tangent point on the sphere surface in the direction from the center to the point.
+				Then I compute a correction vector from <code>last_position</code> to that tangent point, and set the new <code>position</code> to
+				<code>last_position</code> plus that correction, scaled down by \((1 - f)^2\) so higher friction makes the point “stick” more instead
+				of sliding freely.
+			</p>
+			<p>
+				<strong>Plane:</strong> For the plane, I check if the point mass crossed from one side of the plane to the other between
+				<code>last_position</code> and <code>position</code> (sign change of the dot product with the plane normal). If it crossed, I solve
+				for the intersection point (tangent point) along the straight segment from last \(\rightarrow\) current, then push the point slightly
+				off the plane by a tiny <code>SURFACE_OFFSET</code> on the original side. Like the sphere, I apply friction by scaling the correction by
+				\((1 - f)^2\).
+			</p>
+
+			<h3>Sphere collision results (sphere.json) with varying \(k_s\)</h3>
+			<p>
+				With a low \(k_s\) (like 500), the cloth is much stretchier and it tends to droop more over the sphere, with smoother, larger-scale
+				folds because the springs don’t resist deformation much. At the default \(k_s = 5000\), it still drapes nicely but it holds its shape
+				better and the folds look more “fabric-like.” With a very high \(k_s\) (like 50000), it barely stretches and looks noticeably stiffer,
+				so the cloth sits more like a rigid sheet draped over the sphere with tighter / sharper wrinkles.
+			</p>
+
+			<p><strong>Figure 3a — <code>scene/sphere.json</code> final resting state, \(k_s = 5000\) (default)</strong></p>
+			<img src="images/img3a_5000ks.png" width="800" alt="TODO: sphere.json shaded cloth at rest, ks=5000" />
+			<p class="caption">Shaded resting state on sphere, \(k_s = 5000\) (default)</p>
+
+			<p><strong>Figure 3b — <code>scene/sphere.json</code> final resting state, \(k_s = 500\)</strong></p>
+			<img src="images/img3b_500ks.png" width="800" alt="TODO: sphere.json shaded cloth at rest, ks=500" />
+			<p class="caption">Shaded resting state on sphere, \(k_s = 500\).</p>
+
+			<p><strong>Figure 3c — <code>scene/sphere.json</code> final resting state, \(k_s = 50000\)</strong></p>
+			<img src="images/img3c_50000ks.png" width="800" alt="TODO: sphere.json shaded cloth at rest, ks=50000" />
+			<p class="caption">Shaded resting state on sphere, \(k_s = 50000\).</p>
+
+			<h3>Plane collision result (cloth on plane)</h3>
+
+			<p><strong>Figure 3d — Shaded cloth at rest on a plane</strong></p>
+			<img src="images/img3d_plane.png" width="800" alt="TODO: shaded cloth at rest on plane" />
+			<p class="caption">Shaded cloth at rest on plane</p>
+
+			<h2>Part 4: Handling self-collisions <span class="rubric-tag">(20 pts)</span></h2>
+			<h3>Self-collision implementation</h3>
+			<p>
+				The main problem with self-collision is that checking every pair of point masses is \(O(n^2)\), which is way too slow once the cloth
+				grid gets bigger. To make it fast enough, I used spatial hashing.
+			</p>
+			<p>
+				Every timestep, I split space into 3D boxes with size
+				\(w = 3 \cdot \frac{\text{width}}{\text{num\_width\_points}}\),
+				\(h = 3 \cdot \frac{\text{height}}{\text{num\_height\_points}}\),
+				and \(t = \max(w, h)\). For each point mass, I “snap” its position into one of these boxes by truncating the coordinates to the nearest
+				box corner (basically flooring to a grid). I then hash that snapped \((x,y,z)\) into a key and insert a pointer to the point mass into a
+				hash map from key \(\rightarrow\) list of point masses in that same box.
+			</p>
+			<p>
+				To resolve self-collisions for a given point mass, I only compare it against the other point masses in its own hashed box. If another
+				point mass is closer than \(2 \cdot \text{thickness}\), I compute a correction that would separate them to exactly that distance (along the
+				direction between them). I average all the corrections for that point mass and then divide by <code>simulation_steps</code> so the correction
+				doesn’t happen too suddenly in one substep.
+			</p>
+
+			<h3>Self-collision sequence: falling and folding</h3>
+			<p><strong>Figure 4a — Early self-collision (initial folds)</strong></p>
+			<img src="images/img4a_fall_start.png" width="800" alt="TODO: early self-collision screenshot" />
+
+			<p><strong>Figure 4b — Mid self-collision (folding/piling)</strong></p>
+			<img src="images/img4b_fall_mid.png" width="800" alt="TODO: mid self-collision screenshot" />
+
+			<p><strong>Figure 4c — Late self-collision (more restful state)</strong></p>
+			<img src="images/img4c_fall_end.png" width="800" alt="TODO: late self-collision screenshot" />
+
+			<h3>Vary density and \(k_s\): effects on self-collision behavior</h3>
+
+			<p>
+				When I increased density, the cloth acted heavier and tended to collapse onto itself more aggressively, so the folds were tighter and the
+				pile-up happened faster. When I decreased density, the cloth felt lighter and the folding looked “softer” and less compressed.
+			</p>
+			<p><strong>Figure 4d — Density variation case</strong></p>
+			<img src="images/img4d_high density.png" width="800" alt="TODO: density variation affecting self-collision" />
+
+			<p>
+				Changing \(k_s\) changed how much the cloth resisted bending/stretching while it tried to fold on itself. With lower \(k_s\), it was easier
+				for the cloth to crumple and bunch up (more squishy looking). With higher \(k_s\), it held its shape more and the folds looked stiffer and
+				less compact.
+			</p>
+			<p><strong>Figure 4e — \(k_s\) variation case</strong></p>
+			<img src="images/img4e_high_ks.png" width="800" alt="TODO: ks variation affecting self-collision" />
+
+			<h2>Part 5: Shaders <span class="rubric-tag">(20 pts)</span></h2>
+			<h3>What is a shader program? Vertex vs fragment shaders</h3>
+			<p>
+				A shader program is basically a little program that runs on the GPU as part of the graphics pipeline. Instead of doing all the math on the CPU
+				for every pixel, the GPU runs the shader in parallel across tons of vertices/fragments at once, which is why it can hit real-time framerates.
+			</p>
+			<p>
+				The <strong>vertex shader</strong> runs once per vertex. In our case it takes in the mesh attributes (position, normal, tangent, UV) and applies the
+				model and view-projection transforms. It also outputs “varyings” like the world-space position/normal/UV, which then get interpolated across each
+				triangle during rasterization.
+			</p>
+			<p>
+				The <strong>fragment shader</strong> runs once per fragment (basically per pixel sample). It reads the interpolated varyings and does the actual shading
+				math (lighting, texture lookups, etc.), and outputs the final RGBA color. The two shaders work together because the fragment shader is using the data
+				the vertex shader prepared + the rasterizer interpolated.
+			</p>
+
+			<h3>Blinn-Phong shading model</h3>
+			<p>
+				Blinn-Phong is a simple lighting model that adds up three pieces: ambient + diffuse + specular. The <strong>ambient</strong> term is just a constant
+				base light so the object isn’t completely black when it’s not directly lit. The <strong>diffuse</strong> term is Lambertian shading, so it depends on
+				\(\max(0, n \cdot l)\) — basically how much the surface faces the light. The <strong>specular</strong> term creates the shiny highlight.
+			</p>
+			<p>
+				The “Blinn” part is that instead of reflecting the light vector, you compute the <strong>half-vector</strong> \(h = \frac{l + v}{\|l + v\|}\), where
+				\(l\) is the light direction and \(v\) is the view direction. Then you use \(\max(0, n \cdot h)^p\) to control the sharpness of the highlight with
+				exponent \(p\).
+			</p>
+
+			<p><strong>Figure 5a — Blinn-Phong: ambient only</strong></p>
+			<img src="images/img5a_ambient.png" width="800" alt="TODO: Blinn-Phong ambient only" />
+
+			<p><strong>Figure 5b — Blinn-Phong: diffuse only</strong></p>
+			<img src="images/img5b_specular.png" width="800" alt="TODO: Blinn-Phong diffuse only" />
+
+			<p><strong>Figure 5c — Blinn-Phong: specular only</strong></p>
+			<img src="images/img5c_diffuse.png" width="800" alt="TODO: Blinn-Phong specular only" />
+
+			<p><strong>Figure 5d — Blinn-Phong: full model</strong></p>
+			<img src="images/img5d_phong.png" width="800" alt="TODO: Blinn-Phong full model" />
+
+			<h3>Texture mapping (custom texture)</h3>
+			<p><strong>Figure 5e — Texture mapping with custom texture</strong></p>
+			<img src="images/img5x_custom_texture.png" width="800" alt="TODO: texture mapping with custom texture" />
+
+			<h3>Bump mapping vs displacement mapping</h3>
+			<p>
+				Bump mapping and displacement mapping both use a height map texture, but they change different things. <strong>Bump mapping</strong> only changes the
+				normal used for lighting, so the silhouette/outline of the object doesn’t actually change — it just looks bumpy because the lighting reacts like the
+				surface is tilted. <strong>Displacement mapping</strong> actually moves the vertices along the normal based on the height map, so the geometry changes
+				for real and you can see it in the shape (especially along edges and in strong lighting).
+			</p>
+			<p>
+				On the sphere, mesh resolution matters a lot more for displacement than bump. With a coarse sphere mesh (\(-o 16 -a 16\)), displacement can look
+				blocky or “low poly” because you’re literally moving a small number of big triangles. With a fine mesh (\(-o 128 -a 128\)), there are way more vertices
+				to displace, so the shape looks much smoother and the height map detail comes through better. Bump mapping is less sensitive to mesh resolution since it
+				doesn’t move vertices, but you can still see differences because the interpolated normals change across larger triangles.
+			</p>
+
+			<p><strong>Figure 5f — Bump mapping on cloth (non-default texture)</strong></p>
+			<img src="images/img5e_cloth_bump.png" width="800" alt="TODO: bump mapping on cloth" />
+
+			<p><strong>Figure 5g — Bump mapping on sphere (non-default texture)</strong></p>
+			<img src="images/img5f_sphere_bump.png" width="800" alt="TODO: bump mapping on sphere" />
+
+			<p><strong>Figure 5h — Displacement mapping on sphere (non-default texture)</strong></p>
+			<img src="images/img5g_displacement.png" width="800" alt="TODO: displacement mapping on sphere" />
+
+			<p><strong>Figure 5i — Coarse sphere mesh: -o 16 -a 16</strong></p>
+			<img src="images/img5i_coarse_displacement.png" width="800" alt="TODO: coarse sphere mesh comparison render" />
+
+			<p><strong>Figure 5j — Fine sphere mesh: -o 128 -a 128</strong></p>
+			<img src="images/img5j_fine_sphere.png" width="800" alt="TODO: fine sphere mesh comparison render" />
+
+			<h3>Mirror shader</h3>
+			<p><strong>Figure 5k — Mirror shader on cloth</strong></p>
+			<img src="images/img5k_mirror_cloth.png" width="800" alt="TODO: mirror shader on cloth" />
+
+			<p><strong>Figure 5l — Mirror shader on sphere</strong></p>
+			<img src="images/img5l_mirror_sphere.png" width="800" alt="TODO: mirror shader on sphere" />
+
+		</div>
+	</body>
+</html>
